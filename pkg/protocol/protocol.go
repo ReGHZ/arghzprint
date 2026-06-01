@@ -34,10 +34,12 @@ type InboundMessage struct {
 // JobEnvelope carries a single print job.
 // Type is a free-form string — the daemon maps it to a template file.
 // Payload is arbitrary JSON; template variables reference its keys directly.
+// Priority is optional — daemon's priority_map takes precedence if configured.
+// Backends that don't manage priority can omit it (defaults to 0).
 type JobEnvelope struct {
 	JobID    string         `json:"jobId"`
 	Type     string         `json:"type"`
-	Priority int            `json:"priority"`
+	Priority int            `json:"priority,omitempty"`
 	Payload  map[string]any `json:"payload"`
 }
 

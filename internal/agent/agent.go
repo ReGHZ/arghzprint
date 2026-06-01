@@ -93,12 +93,11 @@ func (a *Agent) enqueue(env protocol.JobEnvelope) {
 
 	j := job.FromEnvelope(env)
 
-	// priority is owned by this daemon, not the backend.
-	// backend sends 0; local config decides processing order.
+	// local priority_map wins when configured.
+	// if not configured for this type, keep whatever the backend sent.
+	// wulfcafe sends 0; backends that set meaningful priority still work.
 	if p, ok := cfg.PriorityMap[env.Type]; ok {
 		j.Priority = p
-	} else {
-		j.Priority = 0
 	}
 
 	a.queue.Push(j)

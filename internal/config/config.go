@@ -36,8 +36,9 @@ type Config struct {
 	// but not printed.
 	EnabledTypes map[string]bool `json:"enabled_types"`
 
-	// PriorityMap overrides the priority sent by the backend per job type.
-	// Higher number = processed first. Types not listed use the backend's value.
+	// PriorityMap sets processing priority per job type. Higher = processed first.
+	// Takes precedence over any priority value sent by the backend.
+	// Types not listed fall back to whatever the backend sent (default 0 for wulfcafe).
 	PriorityMap map[string]int `json:"priority_map"`
 
 	// ConnectionMode is "websocket" (default) or "polling".

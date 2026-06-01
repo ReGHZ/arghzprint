@@ -39,7 +39,7 @@ On first run, `config.json` and default templates are created in:
 ## How It Works
 
 1. arghzprint connects to your backend via WebSocket
-2. Backend pushes a print job: `{ event: "print.job", data: { jobId, type, priority, payload } }`
+2. Backend pushes a print job: `{ event: "print.job", data: { jobId, type, payload } }`
 3. arghzprint finds the template for that `type` (e.g. `kitchen.html`)
 4. Renders the template with `payload` as the data context
 5. Converts HTML → PDF via wkhtmltopdf
@@ -66,13 +66,15 @@ Auth header: `Authorization: Bearer <printer_token>`
 {
   "event": "print.job",
   "data": {
-    "jobId": "cuid...",
-    "type": "KITCHEN",
-    "priority": 2,
+    "jobId":   "cuid...",
+    "type":    "KITCHEN",
     "payload": {}
   }
 }
 ```
+
+`priority` is optional. arghzprint uses its local `priority_map` config when set.
+If not configured, falls back to the value sent by backend (defaults to 0).
 
 **arghzprint → Backend** (status update):
 
@@ -105,16 +107,20 @@ PENDING → DISPATCHED → ACKNOWLEDGED → PRINTING → COMPLETED
 
 ### Priority
 
-Higher number = processed first. Default priority by type (configurable in Settings):
+Configured in arghzprint Settings (`priority_map`) — not by the backend.
+Higher number = processed first. FIFO within the same priority.
 
-| Type     | Default priority |
-| -------- | ---------------- |
-| KITCHEN  | 2                |
-| BAR      | 1                |
-| CUSTOMER | 0                |
-| BILLIARD | 0                |
+Default values (set in arghzprint config, editable):
 
-Jobs with the same priority are processed in arrival order (FIFO).
+| Type     | Default |
+| -------- | ------- |
+| KITCHEN  | 2       |
+| BAR      | 1       |
+| CUSTOMER | 0       |
+| BILLIARD | 0       |
+
+If `priority_map` has no entry for a type, the backend's value is used (typically 0).
+Backends that manage priority themselves can skip `priority_map` entirely.
 
 ---
 
@@ -321,20 +327,33 @@ To remove a type: delete its template, it disappears from Settings automatically
 
 ### Windows (recommended)
 
-Install as a Windows Service using [NSSM](https://nssm.cc):
+**Option A — Task Scheduler (recommended for always-on machines)**
+
+Runs at system boot before login. No third-party tools needed.
+
+```bat
+schtasks /create /tn "arghzprint" /tr "C:\path\to\arghzprint.exe" /sc ONSTART /ru SYSTEM /f
+```
+
+To stop and remove:
+
+```bat
+schtasks /end /tn "arghzprint"
+schtasks /delete /tn "arghzprint" /f
+```
+
+**Option B — Startup folder (runs after user login)**
+
+Place a shortcut to `arghzprint.exe` in:
 
 ```
-nssm install arghzprint "C:\path\to\arghzprint.exe"
-nssm start arghzprint
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
 ```
 
-Or run at startup via Task Scheduler:
+**Option C — Run manually**
 
-```
-Action: Start a program
-Program: C:\path\to\arghzprint.exe
-Run whether user is logged on or not: yes
-```
+For testing or ad-hoc use, just double-click or run `arghzprint.exe` directly.
+Web UI available at http://localhost:7878.
 
 ### Linux (systemd)
 
