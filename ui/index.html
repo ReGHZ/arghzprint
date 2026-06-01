@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>arghzprint</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/alpine.js" defer></script>
+</head>
+<body>
+
+<div class="shell" x-data>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" x-data>
+    <div class="sidebar-header">
+      <div class="brand">arghz<em>print</em></div>
+      <div class="brand-sub">Local Print Daemon</div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item" :class="{ active: $store.nav.page === 'dashboard' }" @click="$store.nav.go('dashboard')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" :class="{ active: $store.nav.page === 'settings' }" @click="$store.nav.go('settings')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M4.22 4.22l2.12 2.12m11.32 11.32 2.12 2.12M2 12h3m14 0h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+        Settings
+      </button>
+      <button class="nav-item" :class="{ active: $store.nav.page === 'templates' }" @click="$store.nav.go('templates')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Templates
+      </button>
+      <button class="nav-item" :class="{ active: $store.nav.page === 'jobs' }" @click="$store.nav.go('jobs')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Jobs
+      </button>
+    </nav>
+
+    <!-- Connection status in sidebar footer — reads from $store.status, no own interval -->
+    <div class="sidebar-footer">
+      <div class="conn-badge">
+        <span class="conn-dot" :class="$store.status.connected ? 'on' : 'off'"></span>
+        <span x-text="$store.status.connected ? 'Connected' : 'Disconnected'"></span>
+      </div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+        x-text="$store.status.backendUrl"></div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Dashboard — reads from $store.status, no own polling -->
+    <section class="page" :class="{ active: $store.nav.page === 'dashboard' }">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-desc">Realtime status of your print daemon</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Connection</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+            <span class="status-dot-big" :class="$store.status.connected ? 'on' : 'off'"></span>
+            <div>
+              <div class="stat-label" style="font-size:14px;font-weight:600;color:var(--text)"
+                x-text="$store.status.connected ? 'Online' : 'Offline'"></div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:1px"
+                x-text="$store.status.connected ? 'Backend reachable' : 'Retrying...'"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Queue</div>
+          <div class="stat-value" x-text="$store.status.queueDepth" style="margin-top:8px"></div>
+          <div class="stat-label">pending jobs</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Backend</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--text-2);word-break:break-all"
+            x-text="$store.status.backendUrl || '—'"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">About</div>
+        <p style="font-size:12px;color:var(--text-2);line-height:1.7">
+          arghzprint connects to your backend, receives print jobs via WebSocket, renders them using your configured templates, and sends to the appropriate printer.
+          <br><br>
+          Configure backend URL and printer assignments in
+          <button style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0" @click="$store.nav.go('settings')">Settings</button>,
+          then create or customize receipt templates in
+          <button style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0" @click="$store.nav.go('templates')">Templates</button>.
+        </p>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="page" :class="{ active: $store.nav.page === 'settings' }" x-data="settings" x-init="init()">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Settings</div>
+          <div class="page-desc">Backend connection and printer assignment</div>
+        </div>
+        <button class="btn btn-primary" @click="save()" :disabled="loading">Save settings</button>
+      </div>
+
+      <!-- restart required banner -->
+      <div x-show="needsRestart"
+        style="background:rgba(245,158,11,0.1);border:1px solid var(--warn);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--warn);display:flex;align-items:center;gap:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Web UI port changed — restart arghzprint for it to take effect.
+      </div>
+
+      <div class="card" x-show="!loading">
+        <div class="card-title">Backend</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Backend URL</label>
+            <input type="url" x-model="cfg.backend_url" placeholder="https://api.example.com">
+          </div>
+          <div class="field">
+            <label>Printer Token</label>
+            <input type="password" x-model="cfg.printer_token" placeholder="secret token">
+          </div>
+        </div>
+        <div class="field-row" style="margin-top:12px">
+          <div class="field">
+            <label>Connection mode</label>
+            <select x-model="cfg.connection_mode">
+              <option value="websocket">WebSocket (realtime)</option>
+              <option value="polling">HTTP Polling (fallback)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label x-text="cfg.connection_mode === 'polling' ? 'Poll interval (s)' : 'WS path'"></label>
+            <input type="text" x-show="cfg.connection_mode !== 'polling'" x-model="cfg.ws_path" placeholder="/api/printer/ws">
+            <input type="number" x-show="cfg.connection_mode === 'polling'" x-model.number="cfg.polling_interval_seconds" min="1" max="60">
+          </div>
+          <div class="field">
+            <label>Max retries</label>
+            <input type="number" x-model.number="cfg.max_retries" min="1" max="10">
+          </div>
+        </div>
+        <div class="field-row" style="margin-top:12px">
+          <div class="field">
+            <label>Web UI Port <span style="color:var(--text-3)">(restart required)</span></label>
+            <input type="number" x-model.number="cfg.web_ui_port" min="1024" max="65535">
+          </div>
+          <div class="field"></div>
+          <div class="field"></div>
+        </div>
+      </div>
+
+      <div class="card" x-show="!loading">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:0">Printer mapping</div>
+          <button class="btn btn-ghost btn-sm" @click="$store.nav.go('templates')" title="Manage types in Templates">
+            Manage types →
+          </button>
+        </div>
+
+        <div x-show="rows.length === 0" class="empty">
+          <div class="empty-icon">🖨️</div>
+          <p>No templates found.<br>Create templates first to configure printer mapping.</p>
+          <button class="btn btn-ghost btn-sm" style="margin-top:12px" @click="$store.nav.go('templates')">Go to Templates</button>
+        </div>
+
+        <!-- header row -->
+        <div class="printer-row" style="padding-bottom:6px;border-bottom:1px solid var(--border-hi)">
+          <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Type</span>
+          <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Printer</span>
+          <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;text-align:center">Priority</span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+
+        <template x-for="row in rows" :key="row.type">
+          <div class="printer-row">
+            <div class="printer-type-tag" x-text="row.type"></div>
+
+            <input type="text"
+              x-model="row.printer"
+              placeholder="Printer name"
+              list="printer-list"
+              autocomplete="off">
+
+            <input type="number"
+              class="priority-input"
+              x-model.number="row.priority"
+              min="0" max="99"
+              title="Priority — higher = processed first">
+
+            <label class="toggle" :title="row.enabled ? 'Auto-print on' : 'Disabled'">
+              <input type="checkbox" x-model="row.enabled">
+              <span class="toggle-track"></span>
+              <span class="toggle-thumb"></span>
+            </label>
+
+            <span style="font-size:11px;min-width:28px"
+              :style="row.enabled ? 'color:var(--success)' : 'color:var(--text-3)'"
+              x-text="row.enabled ? 'on' : 'off'">
+            </span>
+
+            <!-- test print -->
+            <button class="btn btn-icon btn-ghost btn-sm"
+              title="Send test print to this printer"
+              @click="testPrint(row)"
+              x-show="row.printer">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            </button>
+          </div>
+        </template>
+
+        <!-- x-html because x-for inside datalist is unreliable — browser expects direct <option> children -->
+        <datalist id="printer-list" x-html="printers.map(p => `<option value='${p}'>`).join('')"></datalist>
+
+        <p style="font-size:11px;color:var(--text-3);margin-top:12px">
+          Type a printer name or pick from the dropdown suggestions (detected from your OS).
+          Toggle to enable/disable auto-print per type.
+        </p>
+      </div>
+
+      <div x-show="loading" style="color:var(--text-3);font-size:13px">Loading...</div>
+    </section>
+
+    <!-- Template Editor -->
+    <section class="page full-height" :class="{ active: $store.nav.page === 'templates' }" x-data="templateEditor" x-init="init()">
+      <div class="editor-shell">
+
+        <!-- Top bar -->
+        <div class="editor-topbar">
+          <div class="type-tabs">
+            <template x-for="type in types" :key="type">
+              <button class="type-tab" :class="{ active: active === type }" @click="openType(type)" x-text="type"></button>
+            </template>
+          </div>
+          <div class="editor-topbar-right">
+            <span x-show="unsaved" style="font-size:11px;color:var(--warn)">● unsaved</span>
+            <button class="btn btn-ghost btn-sm" @click="newTypeDialog = true">+ New</button>
+            <button class="btn btn-ghost btn-sm" @click="deleteActive()" x-show="active" style="color:var(--danger)">Delete</button>
+            <button class="btn btn-primary btn-sm" @click="save()" x-show="active">Save</button>
+          </div>
+        </div>
+
+        <!-- Editor + Preview -->
+        <div class="editor-body" x-show="active">
+          <div class="editor-pane">
+            <div class="pane-label">HTML Template (Handlebars)</div>
+            <div id="ace-editor"></div>
+          </div>
+
+          <div class="preview-pane">
+            <div class="pane-label" style="display:flex;align-items:center;gap:6px">
+              <span class="live-dot"></span>
+              Live Preview — 80mm
+              <span x-show="previewPending" style="color:var(--text-3);margin-left:auto;font-size:10px">rendering...</span>
+            </div>
+            <div class="preview-scroll">
+              <div class="preview-device">
+                <iframe id="preview-frame"
+                  sandbox="allow-same-origin"
+                  :srcdoc="previewHtml"
+                  @load="$el.style.height = ($el.contentDocument?.body?.scrollHeight + 24) + 'px'"
+                ></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty" x-show="!active" style="flex:1">
+          <div class="empty-icon">📄</div>
+          <p>No templates yet.<br>Click "+ New" to create one.</p>
+        </div>
+
+      </div>
+
+      <!-- New type dialog -->
+      <div class="dialog-overlay" x-show="newTypeDialog" @keydown.escape.window="newTypeDialog = false">
+        <div class="dialog" @click.stop>
+          <h3>New Template</h3>
+          <div class="field">
+            <label>Job type name</label>
+            <input type="text" x-model="newTypeName" placeholder="e.g. INVOICE" @keydown.enter="confirmNewType()" x-ref="newTypeInput" x-init="$watch('newTypeDialog', v => v && $nextTick(() => $refs.newTypeInput?.focus()))">
+          </div>
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" @click="newTypeDialog = false">Cancel</button>
+            <button class="btn btn-primary" @click="confirmNewType()">Create</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Jobs -->
+    <section class="page" :class="{ active: $store.nav.page === 'jobs' }" x-data="jobs" x-init="init()">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Jobs</div>
+          <div class="page-desc">Last 100 completed jobs — in-memory, resets on restart</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" @click="load()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-7.07"/></svg>
+          Refresh
+        </button>
+      </div>
+
+      <div class="stats-row" style="grid-template-columns:repeat(2,1fr);max-width:320px">
+        <div class="stat-card">
+          <div class="stat-label">Queue depth</div>
+          <div class="stat-value" x-text="$store.status.queueDepth" style="margin-top:8px"></div>
+          <div class="stat-label">pending</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">History</div>
+          <div class="stat-value" x-text="records.length" style="margin-top:8px"></div>
+          <div class="stat-label">recorded</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <!-- empty state -->
+        <div class="empty" x-show="records.length === 0" style="padding:40px">
+          <div class="empty-icon">📋</div>
+          <p>No jobs yet — history accumulates as jobs are processed.</p>
+        </div>
+
+        <!-- history table -->
+        <div class="table-wrap" x-show="records.length > 0" style="border:none">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Printer</th>
+                <th>Attempts</th>
+                <th>Completed</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in records" :key="r.id">
+                <tr>
+                  <td><span class="printer-type-tag" x-text="r.type"></span></td>
+                  <td><span class="badge" :class="statusClass(r.status)" x-text="r.status"></span></td>
+                  <td class="td-mono" x-text="r.printer || '—'"></td>
+                  <td style="text-align:center;color:var(--text-2)" x-text="r.attempts"></td>
+                  <td class="td-mono" x-text="r.completedAt ? new Date(r.completedAt).toLocaleTimeString() : '—'"></td>
+                  <td style="font-size:11px;color:var(--danger);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                    x-text="r.error || ''" :title="r.error"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast-wrap" x-data>
+  <template x-for="t in $store.toast.items" :key="t.id">
+    <div class="toast" :class="t.type" x-text="t.msg"></div>
+  </template>
+</div>
+
+<script src="/assets/ace/ace.js"></script>
+<script src="/assets/ace/mode-html.js"></script>
+<script src="/assets/ace/theme-one_dark.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

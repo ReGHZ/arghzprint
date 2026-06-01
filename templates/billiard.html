@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 80mm; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 6px 10px 12px; color: #000; background: white; }
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
+    .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+    .divider-solid { border-bottom: 2px solid #000; margin: 8px 0; }
+    .title { text-align: center; font-size: 16px; font-weight: bold; }
+    .booking-code { text-align: center; border: 3px solid #000; padding: 6px; font-size: 20px; font-weight: bold; letter-spacing: 3px; margin: 8px 0; }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 11px; }
+    .slot { padding: 4px 0; border-bottom: 1px dotted #000; font-size: 11px; }
+    .slot:last-child { border-bottom: none; }
+    .total-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; }
+    .total-final { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 5px; margin-top: 4px; }
+    .footer { text-align: center; font-size: 10px; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="title">BILLIARD BOOKING</div>
+  <div class="divider-solid"></div>
+
+  <div class="booking-code">{{bookingCode}}</div>
+
+  <div class="info-row"><span class="bold">Table</span><span>{{tableLabel}}</span></div>
+  <div class="info-row"><span class="bold">Customer</span><span>{{customerName}}</span></div>
+  {{#if customerPhone}}<div class="info-row"><span class="bold">Phone</span><span>{{customerPhone}}</span></div>{{/if}}
+  <div class="info-row"><span class="bold">Persons</span><span>{{personCount}}</span></div>
+  <div class="info-row"><span class="bold">Price/session</span><span>{{pricePerSession}}</span></div>
+
+  <div class="divider"></div>
+
+  <div class="bold" style="margin-bottom:4px">Sessions</div>
+  <div>
+    {{#each slots}}
+    <div class="slot">
+      <div>{{sessionLabel}} — {{date}}</div>
+      <div>{{startTime}} – {{endTime}}</div>
+    </div>
+    {{/each}}
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="total-row"><span>Subtotal</span><span>{{subtotal}}</span></div>
+  {{#if discount}}<div class="total-row"><span>Discount</span><span>-{{discount}}</span></div>{{/if}}
+  {{#if tax}}<div class="total-row"><span>Tax</span><span>{{tax}}</span></div>{{/if}}
+  {{#if serviceCharge}}<div class="total-row"><span>Service charge</span><span>{{serviceCharge}}</span></div>{{/if}}
+  <div class="total-final"><span>TOTAL</span><span>{{total}}</span></div>
+
+  {{#if paymentMethod}}<div class="info-row" style="margin-top:6px"><span>Payment</span><span>{{paymentMethod}}</span></div>{{/if}}
+
+  <div class="footer">Printed: {{timestamp}}</div>
+
+</body>
+</html>

@@ -1,0 +1,28 @@
+# build output
+/arghzprint
+/arghzprint.exe
+
+# cross-compiled binaries
+/arghzprint-*
+
+# tool binaries
+# placeholders (1-byte stubs) ARE committed and needed for go:embed to compile.
+# when adding real binaries, overwrite the placeholders locally, then run:
+#   git update-index --assume-unchanged tools/windows/wkhtmltopdf.exe
+#   git update-index --assume-unchanged tools/windows/SumatraPDF.exe
+#   git update-index --assume-unchanged tools/unix/wkhtmltopdf
+# this prevents git from tracking the large real binaries.
+
+# runtime data (created on first run, machine-specific)
+config.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editors
+.vscode/
+.idea/
+*.swp
+*.swo
