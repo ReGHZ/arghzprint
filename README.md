@@ -38,16 +38,26 @@ On first run, `config.json` and default templates are created in:
 
 ## How It Works
 
-1. arghzprint connects to your backend via WebSocket
+1. arghzprint connects to your backend via WebSocket and sends `printer.hello`
+   to identify itself (agent ID, the job types it handles, version)
 2. Backend pushes a print job: `{ event: "print.job", data: { jobId, type, payload } }`
-3. arghzprint finds the template for that `type` (e.g. `kitchen.html`)
-4. Renders the template with `payload` as the data context
-5. Converts HTML → PDF via wkhtmltopdf
-6. Sends PDF to the configured printer for that type
-7. Reports status back to backend via `PATCH /api/printer/jobs/:id`
+3. arghzprint **claims** the job (`POST /api/printer/jobs/:id/claim`) before doing
+   anything — if another agent already claimed it, this one skips it
+4. Finds the template for that `type` (e.g. `kitchen.html`)
+5. Renders the template with `payload` as the data context
+6. Converts HTML → PDF via wkhtmltopdf
+7. Sends PDF to the configured printer for that type
+8. Reports status back to backend via `PATCH /api/printer/jobs/:id` (tagged with its agent ID)
 
 If arghzprint was offline when jobs were created, it fetches all `PENDING` jobs
 from the backend on reconnect — no jobs are lost.
+
+### Running multiple agents
+
+The claim step makes it safe to run several agents against the same backend
+(e.g. one PC per station). Each agent has a stable, auto-generated **agent ID**,
+announces which types it handles via `printer.hello`, and atomically claims a job
+before printing — so two agents never double-print the same job.
 
 ---
 
@@ -59,6 +69,21 @@ Any backend that implements this protocol can use arghzprint.
 
 Connect: `ws://your-api/api/printer/ws`
 Auth header: `Authorization: Bearer <printer_token>`
+
+**arghzprint → Backend** (sent once, immediately after connect):
+
+```json
+{
+  "event": "printer.hello",
+  "data": {
+    "agentId": "uuid...",
+    "enabledTypes": ["KITCHEN", "BAR"],
+    "version": "0.1.0"
+  }
+}
+```
+
+Use `enabledTypes` to dispatch each job only to agents that handle its type.
 
 **Backend → arghzprint** (push job):
 
@@ -76,34 +101,38 @@ Auth header: `Authorization: Bearer <printer_token>`
 `priority` is optional. arghzprint uses its local `priority_map` config when set.
 If not configured, falls back to the value sent by backend (defaults to 0).
 
-**arghzprint → Backend** (status update):
-
-```json
-{
-  "event": "print.ack",
-  "data": {
-    "jobId": "cuid...",
-    "status": "ACKNOWLEDGED | PRINTING | COMPLETED | FAILED",
-    "error": "only set on FAILED"
-  }
-}
-```
+Status updates are **not** sent over the WebSocket — they go via `PATCH` (below), so
+the only daemon → backend WS messages are `printer.hello` and `pong`.
 
 ### HTTP Endpoints (called by arghzprint → your backend)
 
 ```
-GET  /api/printer/jobs/pending   → { jobs: [ JobEnvelope ] }
-PATCH /api/printer/jobs/:id      → { status, error? }
+GET   /api/printer/jobs/pending    → { jobs: [ JobEnvelope ] }
+POST  /api/printer/jobs/:id/claim  → { agentId }            ⇒ { claimed: bool }
+PATCH /api/printer/jobs/:id        → { agentId, status, error? }
 ```
 
-Called on startup and reconnect to recover jobs that arrived while offline.
+- **claim** is called before a job is printed. Return `{ "claimed": true }` for the
+  first agent to ask and `{ "claimed": false }` (or HTTP `409`) for everyone after —
+  this is what prevents two agents from printing the same job.
+- **pending** is called on startup and reconnect to recover jobs that arrived while
+  offline. Each recovered job is claimed before printing, same as a live push.
+- **PATCH** carries the `agentId` so you can verify the update comes from the agent
+  that actually owns the job.
 
 ### Job Status Lifecycle
 
 ```
-PENDING → DISPATCHED → ACKNOWLEDGED → PRINTING → COMPLETED
-                                                ↘ FAILED (retried up to 3×)
+PENDING → DISPATCHED → (claim) → ACKNOWLEDGED → PRINTING → COMPLETED
+                                                         ↘ FAILED (retried up to 3×)
 ```
+
+`ACKNOWLEDGED` is sent (via `PATCH`) right after a successful claim — for every source,
+WebSocket push and pending recovery alike — before the worker moves the job to `PRINTING`.
+
+A job whose type this agent doesn't have enabled is left untouched: the agent never
+claims it or changes its status, so the backend can route it to an agent that does
+(and `hello.enabledTypes` lets the backend avoid dispatching it here in the first place).
 
 ### Priority
 
@@ -273,6 +302,7 @@ total          string
 
 ```json
 {
+  "agent_id": "auto-generated on first run — do not edit",
   "backend_url": "https://api.example.com",
   "printer_token": "secret",
   "ws_path": "/api/printer/ws",
@@ -293,11 +323,18 @@ total          string
 }
 ```
 
+`agent_id` is generated automatically on first run and shown (read-only) on the
+Settings page. It's how the backend tells your agents apart — don't edit or copy it
+between machines.
+
 `printer_map` and `enabled_types` keys are managed via the Settings page — type names
 are always derived from existing templates, never entered manually.
 
-`enabled_types`: `false` disables auto-print for that type. Jobs are still acknowledged
-but not printed — useful for types you want to handle differently per machine.
+`enabled_types` is an **allowlist**: only types set to `true` are printed. A job for a
+type that's `false` (or not listed) is simply ignored — this agent won't claim it or
+touch its status, leaving it for an agent that does handle it. This same list is sent
+to the backend in `printer.hello`, so the backend can avoid dispatching unwanted types
+in the first place.
 
 **Finding your printer name:**
 

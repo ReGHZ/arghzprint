@@ -18,11 +18,13 @@ const (
 )
 
 // Event names over the WebSocket channel.
+// Status updates are not sent over the WebSocket — they go via PATCH (see
+// StatusUpdateRequest), so the daemon → backend WS traffic is only hello and pong.
 const (
-	EventPrintJob = "print.job" // backend → daemon: new job
-	EventPrintAck = "print.ack" // daemon → backend: status update
-	EventPing     = "ping"
-	EventPong     = "pong"
+	EventPrinterHello = "printer.hello" // daemon → backend: identify on connect
+	EventPrintJob     = "print.job"     // backend → daemon: new job
+	EventPing         = "ping"
+	EventPong         = "pong"
 )
 
 // InboundMessage is the WebSocket envelope from backend → daemon.
@@ -44,16 +46,18 @@ type JobEnvelope struct {
 }
 
 // OutboundMessage is the WebSocket envelope from daemon → backend.
+// Data is HelloData for printer.hello; pong carries no data.
 type OutboundMessage struct {
-	Event string    `json:"event"`
-	Data  AckData   `json:"data"`
+	Event string `json:"event"`
+	Data  any    `json:"data,omitempty"`
 }
 
-// AckData is sent after each status transition.
-type AckData struct {
-	JobID  string    `json:"jobId"`
-	Status JobStatus `json:"status"`
-	Error  string    `json:"error,omitempty"`
+// HelloData identifies the daemon to the backend immediately after connect,
+// so the backend only dispatches jobs for types this agent handles.
+type HelloData struct {
+	AgentID      string   `json:"agentId"`
+	EnabledTypes []string `json:"enabledTypes"`
+	Version      string   `json:"version"`
 }
 
 // PendingJobsResponse is the shape of GET /api/printer/jobs/pending.
@@ -63,7 +67,20 @@ type PendingJobsResponse struct {
 }
 
 // StatusUpdateRequest is the body of PATCH /api/printer/jobs/:id.
+// AgentID lets the backend verify the update comes from the agent that claimed the job.
 type StatusUpdateRequest struct {
-	Status JobStatus `json:"status"`
-	Error  string    `json:"error,omitempty"`
+	AgentID string    `json:"agentId"`
+	Status  JobStatus `json:"status"`
+	Error   string    `json:"error,omitempty"`
+}
+
+// ClaimRequest is the body of POST /api/printer/jobs/:id/claim.
+type ClaimRequest struct {
+	AgentID string `json:"agentId"`
+}
+
+// ClaimResponse reports whether this agent won the claim. A false value
+// (or a 409) means another agent already owns the job.
+type ClaimResponse struct {
+	Claimed bool `json:"claimed"`
 }

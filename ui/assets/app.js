@@ -75,6 +75,7 @@ document.addEventListener('alpine:init', () => {
 
   Alpine.data('settings', () => ({
     cfg: {
+      agent_id: '',
       backend_url: '',
       printer_token: '',
       ws_path: '/api/printer/ws',

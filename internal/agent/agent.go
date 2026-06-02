@@ -13,6 +13,9 @@ import (
 	"github.com/ReGHZ/arghzprint/pkg/protocol"
 )
 
+// daemonVersion is reported to the backend in printer.hello.
+const daemonVersion = "0.1.0"
+
 // StatusFunc is called whenever the connection state changes.
 // Used to update the dashboard UI without coupling agent to the server.
 type StatusFunc func(connected bool)
@@ -72,24 +75,67 @@ func (a *Agent) Run(ctx context.Context) {
 	}
 }
 
-// SendAck queues an outbound ACK to the backend.
-// Non-blocking — drops silently if the send buffer is full (reconnect will re-sync via polling).
-func (a *Agent) SendAck(msg protocol.OutboundMessage) {
+// SendOut queues an outbound message (ack or hello) to the backend.
+// Non-blocking — drops silently if the send buffer is full (reconnect re-syncs).
+func (a *Agent) SendOut(msg protocol.OutboundMessage) {
 	select {
 	case a.sendCh <- msg:
 	default:
-		slog.Warn("send buffer full, dropping ack", "jobId", msg.Data.JobID)
+		slog.Warn("send buffer full, dropping outbound", "event", msg.Event)
 	}
 }
 
-// enqueue converts an envelope to a Job and pushes it into the working queue.
-func (a *Agent) enqueue(env protocol.JobEnvelope) {
+// helloMessage builds the printer.hello identifying this daemon.
+func (a *Agent) helloMessage() protocol.OutboundMessage {
 	cfg := a.cfg.Get()
 
-	if enabled, ok := cfg.EnabledTypes[env.Type]; ok && !enabled {
-		slog.Debug("job type disabled, skipping", "type", env.Type, "jobId", env.JobID)
-		return
+	enabled := make([]string, 0, len(cfg.EnabledTypes))
+	for t, on := range cfg.EnabledTypes {
+		if on {
+			enabled = append(enabled, t)
+		}
 	}
+
+	return protocol.OutboundMessage{
+		Event: protocol.EventPrinterHello,
+		Data: protocol.HelloData{
+			AgentID:      cfg.AgentID,
+			EnabledTypes: enabled,
+			Version:      daemonVersion,
+		},
+	}
+}
+
+// claimAndEnqueue claims a job from the backend before pushing it into the
+// working queue. Returns true only when the job was claimed and enqueued.
+//
+// Claiming is mandatory: without it, two daemons sharing a backend both enqueue
+// the same job and double-print.
+func (a *Agent) claimAndEnqueue(ctx context.Context, env protocol.JobEnvelope) bool {
+	cfg := a.cfg.Get()
+
+	// enabled_types is an allowlist. A type that isn't enabled here is left
+	// untouched — never claimed, never status-updated — so another agent that
+	// does handle it can claim it. Canceling a job we don't own would kill it
+	// for everyone. The backend also filters by hello.enabledTypes.
+	if !cfg.EnabledTypes[env.Type] {
+		slog.Debug("job type not enabled, skipping", "type", env.Type, "jobId", env.JobID)
+		return false
+	}
+
+	claimed, err := a.ClaimJob(ctx, env.JobID)
+	if err != nil {
+		slog.Warn("claim failed", "jobId", env.JobID, "err", err)
+		return false
+	}
+	if !claimed {
+		slog.Debug("job claimed by another agent", "jobId", env.JobID)
+		return false
+	}
+
+	// strict lifecycle is CLAIMED → ACKNOWLEDGED → PRINTING. Send ACK now, before
+	// the worker transitions to PRINTING, for every source (WS push and recovery).
+	a.UpdateStatus(ctx, env.JobID, protocol.JobStatusAcknowledged, "")
 
 	j := job.FromEnvelope(env)
 
@@ -102,4 +148,5 @@ func (a *Agent) enqueue(env protocol.JobEnvelope) {
 
 	a.queue.Push(j)
 	slog.Info("job enqueued", "id", j.ID, "type", j.Type, "priority", j.Priority)
+	return true
 }

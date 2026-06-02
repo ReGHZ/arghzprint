@@ -45,6 +45,15 @@ func (a *Agent) runWebSocket(ctx context.Context) error {
 	}
 	slog.Info("websocket connected", "url", wsURL)
 
+	// identify before anything else. Written directly, not via sendCh: the write
+	// loop that owns conn writes hasn't started yet, and fetchPending below must
+	// not run before the backend knows which types this agent handles.
+	hello, _ := json.Marshal(a.helloMessage())
+	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	if err := conn.WriteMessage(websocket.TextMessage, hello); err != nil {
+		return fmt.Errorf("send hello: %w", err)
+	}
+
 	// pull pending jobs that arrived while we were offline
 	if err := a.fetchPending(ctx); err != nil {
 		slog.Warn("failed to fetch pending jobs on connect", "err", err)
@@ -73,17 +82,10 @@ func (a *Agent) runWebSocket(ctx context.Context) error {
 
 			switch msg.Event {
 			case protocol.EventPrintJob:
-				a.enqueue(msg.Data)
-				a.SendAck(protocol.OutboundMessage{
-					Event: protocol.EventPrintAck,
-					Data: protocol.AckData{
-						JobID:  msg.Data.JobID,
-						Status: protocol.JobStatusAcknowledged,
-					},
-				})
+				a.claimAndEnqueue(ctx, msg.Data)
 			case protocol.EventPing:
 				// backend-initiated ping (not WS-level ping, but app-level)
-				a.SendAck(protocol.OutboundMessage{Event: protocol.EventPong})
+				a.SendOut(protocol.OutboundMessage{Event: protocol.EventPong})
 			}
 		}
 	}()

@@ -152,7 +152,12 @@
             <label>Web UI Port <span style="color:var(--text-3)">(restart required)</span></label>
             <input type="number" x-model.number="cfg.web_ui_port" min="1024" max="65535">
           </div>
-          <div class="field"></div>
+          <div class="field">
+            <label>Agent ID <span style="color:var(--text-3)">(read-only — identifies this daemon to the backend)</span></label>
+            <input type="text" :value="cfg.agent_id" readonly
+              style="color:var(--text-3);font-family:monospace;font-size:11px"
+              @focus="$event.target.select()">
+          </div>
           <div class="field"></div>
         </div>
       </div>

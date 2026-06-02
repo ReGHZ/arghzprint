@@ -19,6 +19,10 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// agent_id is daemon-owned, not user-editable — a save must never wipe it,
+	// otherwise it regenerates on next load and the backend loses claim ownership
+	cfg.AgentID = h.cfg.Get().AgentID
+
 	if err := h.cfg.Save(cfg); err != nil {
 		http.Error(w, "failed to save config", http.StatusInternalServerError)
 		return

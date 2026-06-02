@@ -43,15 +43,58 @@ func (a *Agent) fetchPending(ctx context.Context) error {
 		return fmt.Errorf("parse pending jobs: %w", err)
 	}
 
+	enqueued := 0
 	for _, env := range result.Jobs {
-		a.enqueue(env)
+		if a.claimAndEnqueue(ctx, env) {
+			enqueued++
+		}
 	}
 
-	if len(result.Jobs) > 0 {
-		slog.Info("recovered pending jobs", "count", len(result.Jobs))
+	if enqueued > 0 {
+		slog.Info("recovered pending jobs", "count", enqueued)
 	}
 
 	return nil
+}
+
+// ClaimJob calls POST /api/printer/jobs/:id/claim. It reports whether this
+// agent won the claim — a false result (or 409 Conflict) means another agent
+// already owns the job and we must not enqueue or print it.
+func (a *Agent) ClaimJob(ctx context.Context, jobID string) (bool, error) {
+	cfg := a.cfg.Get()
+
+	body, _ := json.Marshal(protocol.ClaimRequest{AgentID: cfg.AgentID})
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		cfg.BackendURL+"/api/printer/jobs/"+jobID+"/claim",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.PrinterToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("claim job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusConflict {
+		return false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("backend returned %d", resp.StatusCode)
+	}
+
+	var result protocol.ClaimResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, fmt.Errorf("parse claim response: %w", err)
+	}
+	return result.Claimed, nil
 }
 
 // UpdateStatus sends a PATCH to the backend to update a job's status.
@@ -61,8 +104,9 @@ func (a *Agent) UpdateStatus(ctx context.Context, jobID string, status protocol.
 	cfg := a.cfg.Get()
 
 	body, _ := json.Marshal(protocol.StatusUpdateRequest{
-		Status: status,
-		Error:  jobErr,
+		AgentID: cfg.AgentID,
+		Status:  status,
+		Error:   jobErr,
 	})
 
 	req, err := http.NewRequestWithContext(

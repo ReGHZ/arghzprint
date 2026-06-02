@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +13,11 @@ import (
 // Config is the runtime configuration for arghzprint.
 // Stored as config.json in the OS-appropriate data directory.
 type Config struct {
+	// AgentID is a stable UUID identifying this daemon instance to the backend.
+	// Generated once on first run and persisted — never regenerated, so the
+	// backend can attribute job claims and status updates to a specific agent.
+	AgentID string `json:"agent_id"`
+
 	// BackendURL is the base URL of the backend (e.g. "https://api.example.com").
 	BackendURL string `json:"backend_url"`
 
@@ -31,9 +37,10 @@ type Config struct {
 	// e.g. { "KITCHEN": "Epson-TM-T82-Dapur", "CUSTOMER": "Epson-Kasir" }
 	PrinterMap map[string]string `json:"printer_map"`
 
-	// EnabledTypes controls which job types are processed.
-	// Jobs with a type not listed here (or set to false) are acknowledged
-	// but not printed.
+	// EnabledTypes is the allowlist of job types this agent prints.
+	// A type must be present and set to true. Anything not listed (or false)
+	// is left for another agent — never claimed or canceled here.
+	// Also reported to the backend in printer.hello.
 	EnabledTypes map[string]bool `json:"enabled_types"`
 
 	// PriorityMap sets processing priority per job type. Higher = processed first.
@@ -116,6 +123,7 @@ func (m *Manager) load() error {
 	data, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
 		m.current = defaults()
+		m.current.AgentID = newAgentID()
 		return m.write()
 	}
 	if err != nil {
@@ -128,7 +136,22 @@ func (m *Manager) load() error {
 	}
 
 	m.current = cfg
+
+	// configs written before agent_id existed — backfill and persist once
+	if m.current.AgentID == "" {
+		m.current.AgentID = newAgentID()
+		return m.write()
+	}
 	return nil
+}
+
+// newAgentID returns a random UUIDv4 string.
+func newAgentID() string {
+	var b [16]byte
+	rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func (m *Manager) write() error {
