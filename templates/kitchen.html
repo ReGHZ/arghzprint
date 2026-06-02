@@ -3,83 +3,295 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    @page { size: 80mm auto; margin: 0; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 80mm; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 6px 10px 12px; color: #000; background: white; }
-    .center { text-align: center; }
-    .bold { font-weight: bold; }
-    .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
-    .divider-solid { border-bottom: 2px solid #000; margin: 8px 0; }
-    .station-badge { text-align: center; border: 2px solid #000; padding: 6px; font-size: 15px; font-weight: bold; margin: 8px 0; }
-    .order-token { text-align: center; border: 3px solid #000; padding: 6px 10px; font-size: 26px; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; }
-    .token-label { font-size: 10px; font-weight: normal; letter-spacing: 0; }
-    .table-label { text-align: center; font-size: 15px; font-weight: bold; background: #f0f0f0; padding: 5px; margin-bottom: 8px; }
-    .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 11px; }
-    .item { padding: 6px 0; border-bottom: 1px dotted #000; }
-    .item:last-child { border-bottom: none; }
-    .item-name { font-weight: bold; font-size: 13px; }
-    .item-qty { font-size: 12px; margin-left: 8px; }
-    .item-note { font-size: 11px; font-style: italic; margin-left: 8px; }
-    .item-serving { font-size: 11px; margin-left: 8px; color: #333; }
-    .modifier { font-size: 11px; margin-left: 20px; list-style: disc; }
-    .order-note { border: 1px solid #000; padding: 6px; margin-bottom: 8px; font-size: 11px; }
-    .footer { text-align: center; font-size: 10px; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 80mm;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 5px 10px 10px 10px;
+      background: white;
+      color: #000;
+      margin: 0 !important;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 2px dashed #000;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #000;
+    }
+
+    .header .subtitle {
+      font-size: 14px;
+      font-weight: bold;
+      color: #000;
+    }
+
+    .station-badge {
+      text-align: center;
+      padding: 8px;
+      margin: 10px 0;
+      font-size: 16px;
+      font-weight: bold;
+      border: 2px solid #000;
+      border-radius: 5px;
+      color: #000;
+    }
+
+    .station-badge.kitchen {
+      background: #FFF3E0;
+      border-color: #000;
+    }
+
+    .station-badge.bar {
+      background: #F3E5F5;
+      border-color: #000;
+    }
+
+    .station-badge.mixed {
+      background: #E8EAF6;
+      border-color: #000;
+    }
+
+    .info {
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 10px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+      color: #000;
+    }
+
+    .info-row .label {
+      font-weight: bold;
+      color: #000;
+    }
+
+    .items {
+      margin-bottom: 10px;
+    }
+
+    .item {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px dotted #000;
+    }
+
+    .item:last-child {
+      border-bottom: none;
+    }
+
+    .item-name {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 3px;
+      color: #000;
+    }
+
+    .item-station {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+      margin-left: 5px;
+      background: #f0f0f0;
+      color: #000;
+      border: 1px solid #000;
+    }
+
+    .item-qty {
+      font-size: 12px;
+      margin-left: 10px;
+      color: #000;
+      font-weight: bold;
+    }
+
+    .item-bundle {
+      font-size: 10px;
+      margin-bottom: 2px;
+      font-style: italic;
+      color: #000;
+      font-weight: bold;
+    }
+
+    .item-note {
+      font-size: 11px;
+      margin-left: 10px;
+      font-style: italic;
+      color: #000;
+      font-weight: bold;
+    }
+
+    .item-serving {
+      font-size: 11px;
+      margin-left: 10px;
+      color: #000;
+    }
+
+    .modifier-list {
+      margin-left: 20px;
+      list-style: disc;
+      font-size: 11px;
+      color: #000;
+    }
+
+    .notes {
+      background: #f5f5f5;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #000;
+      border-radius: 3px;
+    }
+
+    .notes-label {
+      font-weight: bold;
+      margin-bottom: 3px;
+      color: #000;
+    }
+
+    .footer {
+      text-align: center;
+      border-top: 2px dashed #000;
+      padding-top: 10px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #000;
+    }
+
+    .order-token {
+      text-align: center;
+      border: 3px solid #000;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #000;
+      letter-spacing: 2px;
+    }
+
+    .order-token-label {
+      font-size: 10px;
+      font-weight: normal;
+      letter-spacing: 0;
+      color: #000;
+    }
+
+    .priority {
+      text-align: center;
+      background: #f5f5f5;
+      color: #000;
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 16px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
-
-  <div class="center bold" style="font-size:18px">KITCHEN ORDER</div>
-  <div class="divider-solid"></div>
+  <div class="header">
+    <h1>WULF CAFE</h1>
+    <div class="subtitle">{{subtitle}}</div>
+  </div>
 
   {{#if station}}
-  <div class="station-badge">{{station}}</div>
+  <div class="station-badge {{stationLower}}">
+    {{station}}
+  </div>
   {{/if}}
 
   {{#if orderToken}}
   <div class="order-token">
-    <div class="token-label">ORDER NO.</div>
+    <div class="order-token-label">NOMOR ORDER</div>
     {{orderToken}}
   </div>
   {{/if}}
 
-  <div class="table-label">TABLE {{tableLabels}}</div>
+  <div class="priority">
+    TABLE {{tableText}}
+  </div>
 
-  <div class="divider"></div>
-
-  <div class="info-row"><span class="bold">Order #</span><span>{{orderId}}</span></div>
-  <div class="info-row"><span class="bold">Service</span><span>{{serviceType}}</span></div>
-  {{#if customerName}}
-  <div class="info-row"><span class="bold">Customer</span><span>{{customerName}}</span></div>
-  {{/if}}
-  <div class="info-row"><span class="bold">Time</span><span>{{timestamp}}</span></div>
+  <div class="info">
+    <div class="info-row">
+      <span class="label">Order:</span>
+      <span>#{{orderId}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Ticket:</span>
+      <span>{{ticketId}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Service:</span>
+      <span>{{serviceType}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Time:</span>
+      <span>{{timeText}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Date:</span>
+      <span>{{dateText}}</span>
+    </div>
+    {{#if customerName}}
+    <div class="info-row">
+      <span class="label">Customer:</span>
+      <span>{{customerName}}</span>
+    </div>
+    {{/if}}
+  </div>
 
   {{#if notes}}
-  <div class="order-note"><strong>NOTE:</strong> {{notes}}</div>
+  <div class="notes">
+    <div class="notes-label">ORDER NOTES:</div>
+    <div>{{notes}}</div>
+  </div>
   {{/if}}
 
-  <div class="divider"></div>
-
-  <div>
+  <div class="items">
     {{#each items}}
     <div class="item">
-      <div class="item-name">{{name}} {{#if station}}<small>[{{station}}]</small>{{/if}}</div>
+      {{#if bundleLabel}}<div class="item-bundle">{{bundleLabel}}</div>{{/if}}
+      <div class="item-name">
+        {{menuItemName}}
+        {{#if station}}<span class="item-station">{{station}}</span>{{/if}}
+      </div>
       <div class="item-qty">Qty: {{qty}}</div>
-      {{#if servingType}}<div class="item-serving">{{servingType}}</div>{{/if}}
-      {{#if notes}}<div class="item-note">Note: {{notes}}</div>{{/if}}
+      {{#if servingText}}<div class="item-serving">Serving: {{servingText}}</div>{{/if}}
       {{#if modifiers}}
-      <ul class="modifier">
-        {{#each modifiers}}
-        <li>{{#if qty}}{{qty}}x {{/if}}{{name}}</li>
-        {{/each}}
+      <ul class="modifier-list">
+        {{#each modifiers}}<li>{{label}}</li>{{/each}}
       </ul>
       {{/if}}
+      {{#if note}}<div class="item-note">Note: {{note}}</div>{{/if}}
     </div>
     {{/each}}
   </div>
 
   <div class="footer">
-    {{#if items}}Total items: {{items.length}} •{{/if}} Printed: {{timestamp}}
+    <div>Total Items: {{totalItems}}</div>
+    <div>Printed: {{printedText}}</div>
   </div>
-
 </body>
 </html>

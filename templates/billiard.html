@@ -5,57 +5,213 @@
   <style>
     @page { size: 80mm auto; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 80mm; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 6px 10px 12px; color: #000; background: white; }
-    .center { text-align: center; }
-    .bold { font-weight: bold; }
-    .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
-    .divider-solid { border-bottom: 2px solid #000; margin: 8px 0; }
-    .title { text-align: center; font-size: 16px; font-weight: bold; }
-    .booking-code { text-align: center; border: 3px solid #000; padding: 6px; font-size: 20px; font-weight: bold; letter-spacing: 3px; margin: 8px 0; }
-    .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 11px; }
-    .slot { padding: 4px 0; border-bottom: 1px dotted #000; font-size: 11px; }
-    .slot:last-child { border-bottom: none; }
-    .total-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; }
-    .total-final { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; border-top: 2px solid #000; padding-top: 5px; margin-top: 4px; }
-    .footer { text-align: center; font-size: 10px; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+    body {
+      width: 80mm;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 5px 10px 10px 10px;
+      background: white;
+      color: #000;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px dashed #000;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    .header h1 { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+    .header .subtitle { font-size: 14px; font-weight: bold; }
+    .badge {
+      text-align: center;
+      background: #f5f5f5;
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      border: 1px solid #000;
+    }
+    .info {
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 10px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+    .info-row .label { font-weight: bold; }
+    .section-title {
+      font-weight: bold;
+      font-size: 13px;
+      margin: 10px 0 5px 0;
+      border-bottom: 1px solid #000;
+      padding-bottom: 3px;
+    }
+    .slot {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      padding: 5px;
+      background: #f5f5f5;
+    }
+    .slot-label { font-weight: bold; }
+    .breakdown {
+      margin: 10px 0;
+      padding: 8px;
+      background: #f5f5f5;
+      border: 1px solid #000;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+      font-size: 11px;
+    }
+    .breakdown-row.discount { font-weight: bold; }
+    .total-section {
+      border-top: 2px solid #000;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .grand-total {
+      font-size: 16px;
+      border-top: 1px dashed #000;
+      padding-top: 5px;
+      margin-top: 5px;
+    }
+    .footer {
+      text-align: center;
+      border-top: 2px dashed #000;
+      padding-top: 10px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+    .footer-message { margin-top: 5px; font-size: 12px; font-weight: bold; }
+
+    .qr-section {
+      text-align: center;
+      margin-top: 15px;
+      margin-bottom: 5px;
+    }
+    .qr-section img {
+      max-width: 120px;
+      height: auto;
+      margin: 0 auto;
+    }
+    .qr-text {
+      font-size: 11px;
+      font-weight: bold;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
-
-  <div class="title">BILLIARD BOOKING</div>
-  <div class="divider-solid"></div>
-
-  <div class="booking-code">{{bookingCode}}</div>
-
-  <div class="info-row"><span class="bold">Table</span><span>{{tableLabel}}</span></div>
-  <div class="info-row"><span class="bold">Customer</span><span>{{customerName}}</span></div>
-  {{#if customerPhone}}<div class="info-row"><span class="bold">Phone</span><span>{{customerPhone}}</span></div>{{/if}}
-  <div class="info-row"><span class="bold">Persons</span><span>{{personCount}}</span></div>
-  <div class="info-row"><span class="bold">Price/session</span><span>{{pricePerSession}}</span></div>
-
-  <div class="divider"></div>
-
-  <div class="bold" style="margin-bottom:4px">Sessions</div>
-  <div>
-    {{#each slots}}
-    <div class="slot">
-      <div>{{sessionLabel}} — {{date}}</div>
-      <div>{{startTime}} – {{endTime}}</div>
-    </div>
-    {{/each}}
+  <div class="header">
+    <h1>WULF BILLIARD</h1>
+    <div class="subtitle">{{subtitle}}</div>
   </div>
 
-  <div class="divider"></div>
+  <div class="badge">
+    {{tableLabelUpper}}
+  </div>
 
-  <div class="total-row"><span>Subtotal</span><span>{{subtotal}}</span></div>
-  {{#if discount}}<div class="total-row"><span>Discount</span><span>-{{discount}}</span></div>{{/if}}
-  {{#if tax}}<div class="total-row"><span>Tax</span><span>{{tax}}</span></div>{{/if}}
-  {{#if serviceCharge}}<div class="total-row"><span>Service charge</span><span>{{serviceCharge}}</span></div>{{/if}}
-  <div class="total-final"><span>TOTAL</span><span>{{total}}</span></div>
+  <div class="info">
+    <div class="info-row">
+      <span class="label">Kode Booking:</span>
+      <span>{{bookingCode}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Status:</span>
+      <span>{{statusText}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Tanggal:</span>
+      <span>{{dateText}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Nama:</span>
+      <span>{{customerName}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Telepon:</span>
+      <span>{{customerPhone}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Jumlah Orang:</span>
+      <span>{{personCount}} orang</span>
+    </div>
+  </div>
 
-  {{#if paymentMethod}}<div class="info-row" style="margin-top:6px"><span>Payment</span><span>{{paymentMethod}}</span></div>{{/if}}
+  <div class="section-title">DETAIL SESI ({{totalSessions}} Sesi)</div>
+  {{#each slots}}
+  <div class="slot">
+    <div>
+      <span class="slot-label">{{sessionLabel}}</span>
+      <span> - {{dateText}}</span>
+    </div>
+    <span>{{timeText}}</span>
+  </div>
+  {{/each}}
 
-  <div class="footer">Printed: {{timestamp}}</div>
+  <div class="breakdown">
+    <div class="breakdown-row">
+      <span>{{subtotalLabel}}</span>
+      <span>{{subtotalText}}</span>
+    </div>
+    {{#if hasDiscount}}
+    <div class="breakdown-row discount">
+      <span>Diskon</span>
+      <span>-{{discountText}}</span>
+    </div>
+    {{/if}}
+    <div class="breakdown-row">
+      <span>Pajak</span>
+      <span>{{taxText}}</span>
+    </div>
+    <div class="breakdown-row">
+      <span>Service Charge</span>
+      <span>{{serviceChargeText}}</span>
+    </div>
+  </div>
 
+  <div class="total-section">
+    <div class="total-row">
+      <span>Subtotal:</span>
+      <span>{{totalAmountText}}</span>
+    </div>
+    {{#if hasAdminFee}}
+    <div class="total-row">
+      <span>Biaya Admin (1%):</span>
+      <span>{{adminFeeText}}</span>
+    </div>
+    {{/if}}
+    <div class="total-row grand-total">
+      <span>TOTAL BAYAR:</span>
+      <span>{{grandTotalText}}</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Printed: {{printedText}}</div>
+    <div class="footer-message">Terima kasih!</div>
+    <div style="margin-top: 5px; font-size: 10px;">Harap tunjukkan struk ini saat datang</div>
+
+    {{#if qrDataUrl}}
+    <div class="qr-section">
+      <img src="{{qrDataUrl}}" alt="Feedback QR" />
+      <div class="qr-text">Scan & Bagikan Pengalaman Anda!</div>
+      <div style="font-size: 9px; margin-top: 2px;">Bantu kami menjadi lebih baik</div>
+    </div>
+    {{/if}}
+  </div>
 </body>
 </html>
