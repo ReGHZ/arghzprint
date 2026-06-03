@@ -151,6 +151,22 @@
       color: #000;
     }
 
+    .item-fulfillment {
+      font-size: 11px;
+      margin-left: 10px;
+      color: #000;
+      text-transform: uppercase;
+    }
+
+    .item-fulfillment.takeaway {
+      display: inline-block;
+      font-weight: bold;
+      border: 2px solid #000;
+      padding: 1px 6px;
+      margin: 2px 0 2px 10px;
+      letter-spacing: 1px;
+    }
+
     .modifier-list {
       margin-left: 20px;
       list-style: disc;
@@ -278,6 +294,7 @@
         {{#if station}}<span class="item-station">{{station}}</span>{{/if}}
       </div>
       <div class="item-qty">Qty: {{qty}}</div>
+      {{#if fulfillmentText}}<div class="item-fulfillment{{#if isTakeaway}} takeaway{{/if}}">{{fulfillmentText}}</div>{{/if}}
       {{#if servingText}}<div class="item-serving">Serving: {{servingText}}</div>{{/if}}
       {{#if modifiers}}
       <ul class="modifier-list">
