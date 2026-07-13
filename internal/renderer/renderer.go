@@ -16,12 +16,16 @@ var mu sync.Mutex
 
 // Renderer wraps a wkhtmltopdf binary.
 type Renderer struct {
-	binPath string
+	binPath     string
+	pageWidthMM int
 }
 
 // New returns a Renderer using the given wkhtmltopdf binary path.
-func New(binPath string) *Renderer {
-	return &Renderer{binPath: binPath}
+// pageWidthMM should match the printer driver's actual printable width,
+// not the nominal roll width — drivers commonly report less (e.g. "80mm"
+// paper with only 72mm printable). Rendering wider than that gets clipped.
+func New(binPath string, pageWidthMM int) *Renderer {
+	return &Renderer{binPath: binPath, pageWidthMM: pageWidthMM}
 }
 
 // Render converts HTML to PDF bytes.
@@ -54,7 +58,7 @@ func (r *Renderer) Render(html string) ([]byte, error) {
 	var stderr bytes.Buffer
 	cmd := exec.Command(r.binPath,
 		"--quiet",
-		"--page-width", "80mm",
+		"--page-width", fmt.Sprintf("%dmm", r.pageWidthMM),
 		"--page-height", "297mm", // tall enough for any receipt; wkhtmltopdf clips content
 		"--margin-top", "0",
 		"--margin-bottom", "0",

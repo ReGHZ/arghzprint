@@ -55,6 +55,15 @@ type Config struct {
 	// MaxRetries is how many times the print worker retries a failed job
 	// before marking it FAILED and moving on.
 	MaxRetries int `json:"max_retries"`
+
+	// PrintWidthMM is the actual printable width of the paper, in mm —
+	// not the nominal roll width. Thermal printer drivers often report a
+	// printable area narrower than the roll itself (e.g. Windows shows
+	// "Printer Paper(80(72) x 210mm)" for what's sold as "80mm paper" —
+	// only 72mm of that is printable). Content rendered wider than this
+	// gets clipped by the driver. Check the driver's Paper Size in
+	// Printing Preferences -> Advanced to find the real number.
+	PrintWidthMM int `json:"print_width_mm"`
 }
 
 func defaults() Config {
@@ -72,14 +81,15 @@ func defaults() Config {
 		},
 		ConnectionMode: "websocket",
 		MaxRetries:     3,
+		PrintWidthMM:   80,
 	}
 }
 
 // Manager handles loading and saving the config file.
 type Manager struct {
-	mu       sync.RWMutex
-	path     string
-	current  Config
+	mu      sync.RWMutex
+	path    string
+	current Config
 }
 
 // New loads the config from disk, creating it with defaults if it doesn't exist.

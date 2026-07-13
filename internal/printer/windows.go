@@ -38,6 +38,7 @@ func (p *WindowsPrinter) Print(pdf []byte, printerName string) error {
 	var stderr bytes.Buffer
 	cmd := exec.Command(p.sumatraBin,
 		"-print-to", printerName,
+		"-print-settings", "noscale",
 		"-silent",
 		"-exit-when-done",
 		tmp.Name(),

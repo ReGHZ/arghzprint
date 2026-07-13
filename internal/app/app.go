@@ -75,7 +75,7 @@ func New() (*App, error) {
 	q := job.NewQueue()
 	h := job.NewHistory(100)
 	engine := tmpl.NewEngine(store)
-	rdr := renderer.New(rendererBin)
+	rdr := renderer.New(rendererBin, cfg.Get().PrintWidthMM)
 	p := printer.New(sumatraBin)
 
 	a := &App{
