@@ -6,7 +6,7 @@ const API = {
       opts.headers['Content-Type'] = 'application/json';
     }
     const r = await fetch('/api' + path, opts);
-    if (!r.ok && r.status !== 204) throw new Error(`${method} ${path} → ${r.status}`);
+    if (!r.ok && r.status !== 204) throw new Error((await r.text()).trim() || `${method} ${path} → ${r.status}`);
     if (r.status === 204 || r.headers.get('content-length') === '0') return null;
     return r.json();
   },
@@ -14,7 +14,7 @@ const API = {
   async text(method, path, body) {
     const opts = { method, headers: { 'Content-Type': 'text/html' }, body };
     const r = await fetch('/api' + path, opts);
-    if (!r.ok && r.status !== 204) throw new Error(`${method} ${path} → ${r.status}`);
+    if (!r.ok && r.status !== 204) throw new Error((await r.text()).trim() || `${method} ${path} → ${r.status}`);
     return r.status === 204 ? null : r.text();
   },
 
@@ -53,6 +53,8 @@ document.addEventListener('alpine:init', () => {
   Alpine.store('status', {
     connected: false,
     queueDepth: 0,
+    platform: '',
+    printers: [],
     backendUrl: '',
     _timer: null,
 
@@ -66,6 +68,8 @@ document.addEventListener('alpine:init', () => {
         const [s, cfg] = await Promise.all([API.get('/status'), API.get('/settings')]);
         this.connected  = s.connected;
         this.queueDepth = s.queueDepth ?? 0;
+        this.platform   = s.platform ?? '';
+        this.printers   = s.printers ?? [];
         this.backendUrl = cfg.backend_url ?? '';
       } catch {}
     },
@@ -82,7 +86,8 @@ document.addEventListener('alpine:init', () => {
       polling_interval_seconds: 5,
       web_ui_port: 7878,
       connection_mode: 'websocket',
-      max_retries: 3,
+      max_job_age_minutes: 30,
+      network_printers: [],
       printer_map: {},
       enabled_types: {},
       priority_map: {},
@@ -118,6 +123,24 @@ document.addEventListener('alpine:init', () => {
       }));
     },
 
+    addNetworkPrinter() {
+      this.cfg.network_printers = [...(this.cfg.network_printers ?? []),
+        { name: '', host: '', port: 9100, width_dots: 576 }];
+    },
+
+    removeNetworkPrinter(i) {
+      this.cfg.network_printers = this.cfg.network_printers.filter((_, idx) => idx !== i);
+    },
+
+    // test print needs a template type; use one mapped to this printer, else the first type
+    async testNetworkPrinter(p) {
+      const type = Object.keys(this.cfg.printer_map ?? {}).find(t => this.cfg.printer_map[t] === p.name)
+        ?? this.rows[0]?.type;
+      if (!type) { Alpine.store('toast').show('Create a template first', 'error'); return; }
+      if (!(await this.save())) return;
+      await this.testPrint({ type, printer: p.name });
+    },
+
     async testPrint(row) {
       if (!row.printer) return;
       try {
@@ -140,10 +163,15 @@ document.addEventListener('alpine:init', () => {
 
       try {
         await API.put('/settings', { ...this.cfg, printer_map, enabled_types, priority_map });
+        this.cfg.printer_map = printer_map;
         this.needsRestart = this.cfg.web_ui_port !== this.savedPort;
+        const pr = await API.get('/printers');
+        this.printers = pr.printers ?? [];
         Alpine.store('toast').show('Settings saved');
+        return true;
       } catch (e) {
         Alpine.store('toast').show(e.message, 'error');
+        return false;
       }
     },
   }));
@@ -160,6 +188,7 @@ document.addEventListener('alpine:init', () => {
     newTypeDialog: false,
     newTypeName: '',
     unsaved: false,
+    mobileView: 'edit', // phones show editor or preview, not both
 
     async init() {
       await this.loadTypes();
@@ -272,6 +301,61 @@ document.addEventListener('alpine:init', () => {
       }
       this.newTypeDialog = false;
       this.newTypeName = '';
+    },
+
+    showPane(view) {
+      this.mobileView = view;
+      // ace measures 0×0 while hidden — re-measure once it's visible again
+      if (view === 'edit') this.$nextTick(() => this.editor?.resize());
+    },
+
+    pickImport() {
+      if (this.unsaved && !confirm('Unsaved changes. Discard?')) return;
+      this.$refs.importFile.click();
+    },
+
+    async importFile(ev) {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+
+      const html  = await file.text();
+      const guess = file.name.replace(/\.html?$/i, '').toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      const type  = (prompt('Import as template type:', guess) || '').toUpperCase().trim();
+      if (!type) return;
+      if (!/^[A-Z0-9_]+$/.test(type)) {
+        Alpine.store('toast').show('Type may only contain A-Z, 0-9 and _', 'error');
+        return;
+      }
+      if (this.types.includes(type) && !confirm(`Overwrite template ${type}?`)) return;
+
+      try {
+        await API.putText('/templates/' + type, html);
+        await this.loadTypes();
+        this.unsaved = false;
+        await this.openType(type);
+        Alpine.store('toast').show('Imported ' + type);
+      } catch (e) {
+        Alpine.store('toast').show(e.message, 'error');
+      }
+    },
+
+    // on Android the WebView can't download blob: URLs — the shell exposes a save bridge
+    exportActive() {
+      if (!this.active) return;
+      const name = this.active.toLowerCase() + '.html';
+      const html = this.editor.getValue();
+
+      if (window.AndroidBridge) {
+        window.AndroidBridge.saveFile(name, html);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
   }));
 

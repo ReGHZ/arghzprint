@@ -23,6 +23,12 @@ func (h *Handler) SaveSettings(w http.ResponseWriter, r *http.Request) {
 	// otherwise it regenerates on next load and the backend loses claim ownership
 	cfg.AgentID = h.cfg.Get().AgentID
 
+	cfg.Normalize()
+	if err := cfg.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if err := h.cfg.Save(cfg); err != nil {
 		http.Error(w, "failed to save config", http.StatusInternalServerError)
 		return

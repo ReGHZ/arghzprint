@@ -319,7 +319,11 @@ total          string
     "BAR": true,
     "CUSTOMER": true,
     "BILLIARD": false
-  }
+  },
+  "max_job_age_minutes": 30,
+  "network_printers": [
+    { "name": "Dapur", "host": "192.168.1.50", "port": 9100, "width_dots": 576 }
+  ]
 }
 ```
 
@@ -335,6 +339,14 @@ type that's `false` (or not listed) is simply ignored — this agent won't claim
 touch its status, leaving it for an agent that does handle it. This same list is sent
 to the backend in `printer.hello`, so the backend can avoid dispatching unwanted types
 in the first place.
+
+Jobs are kept in `arghzprint.db` (SQLite, next to `config.json`) from claim until the
+backend has their final status, so a crash or restart resumes them instead of losing
+them. Each printer gets its own worker: while a printer is unreachable its jobs retry
+with backoff (5s → 60s) for up to `max_job_age_minutes`, then go `FAILED` — other
+printers keep printing meanwhile.
+
+`network_printers` is only used on Android (see below).
 
 **Finding your printer name:**
 
@@ -434,6 +446,41 @@ sudo systemctl enable --now arghzprint
 ```bash
 launchctl load ~/Library/LaunchAgents/com.reghz.arghzprint.plist
 ```
+
+---
+
+## Android
+
+Same Go core, built with gomobile into an APK. Prints to any ESC/POS LAN printer over
+raw TCP (port 9100) — no OS driver.
+
+**Build** (CLI only — Android cmdline-tools with SDK 35 + build-tools 35 + NDK r28+,
+JDK 17, `gomobile init` done; no Android Studio needed):
+
+```bash
+./android/build-aar.sh                 # Go core → android/app/libs/arghzprint.aar
+cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+`android/local.properties` needs `sdk.dir=<path to Android SDK>` (not committed).
+
+**Install & set up the tablet**
+
+1. Install the APK (allow "install unknown apps").
+2. Open arghzprint → follow the Setup checklist (notifications, **battery optimization
+   off** — required, app settings).
+3. Settings → Backend URL + Printer Token (the location's `printerToken`).
+4. Settings → Network printers → add each printer (name, IP from its self-test print,
+   port 9100, width 576 for 80mm / 384 for 58mm).
+5. Printer mapping → e.g. KITCHEN → Dapur, BAR + CUSTOMER → Bar → Save → Test.
+
+Keep `web_ui_port` at 7878 on Android. Templates can be edited in the app, or edited on
+a PC and brought in with **Import** (and taken out with **Export**).
+
+Check receipts without a printer: run `go run ./cmd/fakeprinter -out ./fakeprints` on a
+PC in the same network and add a network printer pointing to that PC's IP — every job is
+saved as a PNG.
 
 ---
 

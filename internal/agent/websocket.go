@@ -82,7 +82,7 @@ func (a *Agent) runWebSocket(ctx context.Context) error {
 
 			switch msg.Event {
 			case protocol.EventPrintJob:
-				a.claimAndEnqueue(ctx, msg.Data)
+				a.claimAndAccept(ctx, msg.Data)
 			case protocol.EventPing:
 				// backend-initiated ping (not WS-level ping, but app-level)
 				a.SendOut(protocol.OutboundMessage{Event: protocol.EventPong})

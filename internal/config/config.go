@@ -3,10 +3,14 @@ package config
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -52,8 +56,8 @@ type Config struct {
 	// Use "polling" for backends that don't expose a WebSocket endpoint.
 	ConnectionMode string `json:"connection_mode"`
 
-	// MaxRetries is how many times the print worker retries a failed job
-	// before marking it FAILED and moving on.
+	// MaxRetries is no longer used — retries now run until MaxJobAgeMinutes.
+	// Kept so older config.json files still round-trip.
 	MaxRetries int `json:"max_retries"`
 
 	// PrintWidthMM is the actual printable width of the paper, in mm —
@@ -64,6 +68,78 @@ type Config struct {
 	// gets clipped by the driver. Check the driver's Paper Size in
 	// Printing Preferences -> Advanced to find the real number.
 	PrintWidthMM int `json:"print_width_mm"`
+
+	// NetworkPrinters are raw-TCP ESC/POS printers (Android). PrinterMap
+	// values refer to these by name.
+	NetworkPrinters []NetworkPrinter `json:"network_printers"`
+
+	// MaxJobAgeMinutes is how long a job keeps retrying while its printer is
+	// down before it's reported FAILED.
+	MaxJobAgeMinutes int `json:"max_job_age_minutes"`
+}
+
+// NetworkPrinter is an ESC/POS printer reached over raw TCP (usually port 9100).
+type NetworkPrinter struct {
+	Name      string `json:"name"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	WidthDots int    `json:"width_dots"`
+}
+
+func (p NetworkPrinter) Addr() string {
+	return net.JoinHostPort(p.Host, strconv.Itoa(p.Port))
+}
+
+// NetworkPrinter looks up a configured network printer by name.
+func (c Config) NetworkPrinter(name string) (NetworkPrinter, bool) {
+	for _, p := range c.NetworkPrinters {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return NetworkPrinter{}, false
+}
+
+// Normalize fills what the settings form may leave blank.
+func (c *Config) Normalize() {
+	for i := range c.NetworkPrinters {
+		p := &c.NetworkPrinters[i]
+		p.Name = strings.TrimSpace(p.Name)
+		p.Host = strings.TrimSpace(p.Host)
+		if p.Port == 0 {
+			p.Port = 9100
+		}
+		if p.WidthDots == 0 {
+			p.WidthDots = 576
+		}
+	}
+	if c.MaxJobAgeMinutes <= 0 {
+		c.MaxJobAgeMinutes = 30
+	}
+}
+
+var ErrInvalidConfig = errors.New("invalid config")
+
+// Validate checks user-supplied settings before they're saved.
+func (c Config) Validate() error {
+	seen := make(map[string]bool, len(c.NetworkPrinters))
+	for _, p := range c.NetworkPrinters {
+		switch {
+		case p.Name == "":
+			return fmt.Errorf("%w: network printer name is required", ErrInvalidConfig)
+		case seen[p.Name]:
+			return fmt.Errorf("%w: duplicate network printer %q", ErrInvalidConfig, p.Name)
+		case p.Host == "":
+			return fmt.Errorf("%w: network printer %q has no host", ErrInvalidConfig, p.Name)
+		case p.Port < 1 || p.Port > 65535:
+			return fmt.Errorf("%w: network printer %q port %d out of range", ErrInvalidConfig, p.Name, p.Port)
+		// GS v 0 packs 8 dots per byte
+		case p.WidthDots <= 0 || p.WidthDots%8 != 0:
+			return fmt.Errorf("%w: network printer %q width_dots must be a positive multiple of 8", ErrInvalidConfig, p.Name)
+		}
+		seen[p.Name] = true
+	}
+	return nil
 }
 
 func defaults() Config {
@@ -82,6 +158,9 @@ func defaults() Config {
 		ConnectionMode: "websocket",
 		MaxRetries:     3,
 		PrintWidthMM:   80,
+
+		NetworkPrinters:  []NetworkPrinter{},
+		MaxJobAgeMinutes: 30,
 	}
 }
 
@@ -94,17 +173,19 @@ type Manager struct {
 
 // New loads the config from disk, creating it with defaults if it doesn't exist.
 func New() (*Manager, error) {
-	path, err := configPath()
+	dir, err := dataDir()
 	if err != nil {
-		return nil, fmt.Errorf("resolve config path: %w", err)
+		return nil, fmt.Errorf("resolve data dir: %w", err)
 	}
+	return NewAt(dir)
+}
 
-	m := &Manager{path: path}
-
+// NewAt loads dir/config.json — Android passes its filesDir, there's no OS data dir to guess
+func NewAt(dir string) (*Manager, error) {
+	m := &Manager{path: filepath.Join(dir, "config.json")}
 	if err := m.load(); err != nil {
 		return nil, err
 	}
-
 	return m, nil
 }
 
@@ -175,15 +256,6 @@ func (m *Manager) write() error {
 	}
 
 	return os.WriteFile(m.path, data, 0644)
-}
-
-// configPath returns the OS-appropriate path for config.json.
-func configPath() (string, error) {
-	dir, err := dataDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.json"), nil
 }
 
 // DataDir returns the base directory for all arghzprint data (config, templates, extracted tools).

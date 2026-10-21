@@ -635,3 +635,100 @@ tbody { background: var(--surface-1); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+/* ── Network printers (Android) ─────────────── */
+
+.netprinter-row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 90px 160px auto auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+/* ── Phone layout ───────────────────────────── */
+/* desktop and tablet are untouched; below 768px the sidebar becomes a bottom tab bar */
+
+.mobile-header,
+.mobile-only { display: none; }
+
+@media (max-width: 768px) {
+  /* sidebar comes first in the DOM — reversing puts it at the bottom */
+  .shell { flex-direction: column-reverse; height: 100dvh; }
+  .main { min-height: 0; }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-header,
+  .sidebar-footer { display: none; }
+
+  .nav { display: flex; gap: 2px; padding: 4px 6px; }
+  .nav-item {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 7px 2px;
+    font-size: 10px;
+    text-align: center;
+  }
+  .nav-item svg { width: 18px; height: 18px; }
+
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .mobile-only { display: flex; }
+
+  .page { padding: 16px; }
+  .page.active { gap: 16px; }
+  .page-header { flex-wrap: wrap; gap: 10px; }
+
+  .stats-row,
+  .field-row,
+  .field-row-3 { grid-template-columns: 1fr; }
+
+  .netprinter-row {
+    grid-template-columns: 1fr 1fr;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .netprinter-row > :nth-child(-n+2) { grid-column: 1 / -1; }
+
+  /* each mapping becomes a 2-line card: type + priority + toggle, then the printer field */
+  .printer-row-head { display: none; }
+  .printer-row {
+    grid-template-columns: 1fr 64px 34px 28px;
+    grid-template-areas:
+      "type    prio    toggle  state"
+      "printer printer printer test";
+  }
+  .printer-row > :nth-child(1) { grid-area: type; justify-self: start; }
+  .printer-row > :nth-child(2) { grid-area: printer; }
+  .printer-row > :nth-child(3) { grid-area: prio; }
+  .printer-row > :nth-child(4) { grid-area: toggle; }
+  .printer-row > :nth-child(5) { grid-area: state; }
+  .printer-row > :nth-child(6) { grid-area: test; }
+
+  .editor-topbar { flex-wrap: wrap; padding: 8px 12px; }
+  .type-tabs { max-width: 100%; overflow-x: auto; }
+  .editor-topbar-right { margin-left: 0; flex-wrap: wrap; }
+  .editor-body { grid-template-columns: 1fr; }
+  .editor-pane { border-right: none; }
+  .preview-scroll { padding: 12px; }
+  .m-hidden { display: none !important; }
+
+  .table-wrap { overflow-x: auto; }
+  .table-wrap table { min-width: 560px; }
+
+  .dialog { width: min(360px, 92vw); }
+}

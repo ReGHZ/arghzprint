@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -40,8 +41,15 @@ func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(html))
 }
 
+// type names become file names — anything else could escape the template dir
+var validType = regexp.MustCompile(`^[A-Z0-9_]+$`)
+
 func (h *Handler) SaveTemplate(w http.ResponseWriter, r *http.Request) {
 	jobType := strings.ToUpper(chi.URLParam(r, "type"))
+	if !validType.MatchString(jobType) {
+		http.Error(w, "type may only contain A-Z, 0-9 and _", http.StatusBadRequest)
+		return
+	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, 512*1024)) // 512KB max
 	if err != nil {

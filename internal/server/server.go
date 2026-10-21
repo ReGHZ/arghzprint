@@ -23,11 +23,12 @@ type Server struct {
 
 func New(
 	cfg *config.Manager,
-	queue *job.Queue,
 	store *tmpl.Store,
 	engine *tmpl.Engine,
 	p printer.Printer,
 	connStatus func() bool,
+	queueDepth func() int,
+	printerStates func() []job.LaneState,
 	onTestPrint func(jobType, printerName string) error,
 	jobHistory func() []job.Record,
 ) *Server {
@@ -36,7 +37,7 @@ func New(
 	r.Use(localhostOnly)
 	r.Use(chimiddleware.RequestID)
 
-	h := handler.New(cfg, queue, store, engine, p, connStatus, onTestPrint, jobHistory)
+	h := handler.New(cfg, store, engine, p, connStatus, queueDepth, printerStates, onTestPrint, jobHistory)
 
 	r.Get("/health", h.Health)
 

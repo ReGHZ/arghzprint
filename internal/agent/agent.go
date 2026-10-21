@@ -1,6 +1,6 @@
-// Package agent manages the connection to the backend and feeds incoming
-// print jobs into the queue. It handles reconnection transparently so the
-// rest of the app doesn't have to care about network state.
+// Package agent manages the connection to the backend and hands claimed print
+// jobs to a Sink. It handles reconnection transparently so the rest of the app
+// doesn't have to care about network state.
 package agent
 
 import (
@@ -20,18 +20,24 @@ const daemonVersion = "0.1.0"
 // Used to update the dashboard UI without coupling agent to the server.
 type StatusFunc func(connected bool)
 
-// Agent connects to the backend, receives jobs, and enqueues them.
-type Agent struct {
-	cfg      *config.Manager
-	queue    *job.Queue
-	onStatus StatusFunc
-	sendCh   chan protocol.OutboundMessage // outbound ACKs
+// Sink takes every job this agent claimed — new work or a redispatch of one
+// already held locally; telling them apart is the sink's job
+type Sink interface {
+	Accept(ctx context.Context, j *job.Job)
 }
 
-func New(cfg *config.Manager, q *job.Queue, onStatus StatusFunc) *Agent {
+// Agent connects to the backend, claims jobs, and hands them to the sink.
+type Agent struct {
+	cfg      *config.Manager
+	sink     Sink
+	onStatus StatusFunc
+	sendCh   chan protocol.OutboundMessage // outbound hello/pong
+}
+
+func New(cfg *config.Manager, sink Sink, onStatus StatusFunc) *Agent {
 	return &Agent{
 		cfg:      cfg,
-		queue:    q,
+		sink:     sink,
 		onStatus: onStatus,
 		sendCh:   make(chan protocol.OutboundMessage, 64),
 	}
@@ -106,12 +112,9 @@ func (a *Agent) helloMessage() protocol.OutboundMessage {
 	}
 }
 
-// claimAndEnqueue claims a job from the backend before pushing it into the
-// working queue. Returns true only when the job was claimed and enqueued.
-//
-// Claiming is mandatory: without it, two daemons sharing a backend both enqueue
-// the same job and double-print.
-func (a *Agent) claimAndEnqueue(ctx context.Context, env protocol.JobEnvelope) bool {
+// claimAndAccept claims a job before handing it to the sink. Claiming is
+// mandatory: without it, two daemons sharing a backend both print the same job.
+func (a *Agent) claimAndAccept(ctx context.Context, env protocol.JobEnvelope) bool {
 	cfg := a.cfg.Get()
 
 	// enabled_types is an allowlist. A type that isn't enabled here is left
@@ -133,10 +136,6 @@ func (a *Agent) claimAndEnqueue(ctx context.Context, env protocol.JobEnvelope) b
 		return false
 	}
 
-	// strict lifecycle is CLAIMED → ACKNOWLEDGED → PRINTING. Send ACK now, before
-	// the worker transitions to PRINTING, for every source (WS push and recovery).
-	a.UpdateStatus(ctx, env.JobID, protocol.JobStatusAcknowledged, "")
-
 	j := job.FromEnvelope(env)
 
 	// local priority_map wins when configured.
@@ -146,7 +145,6 @@ func (a *Agent) claimAndEnqueue(ctx context.Context, env protocol.JobEnvelope) b
 		j.Priority = p
 	}
 
-	a.queue.Push(j)
-	slog.Info("job enqueued", "id", j.ID, "type", j.Type, "priority", j.Priority)
+	a.sink.Accept(ctx, j)
 	return true
 }
